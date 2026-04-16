@@ -17,7 +17,8 @@ const startServer = async () => {
         origin: [
           process.env.FRONTEND_URL,
           'http://localhost:3000',
-          'https://hsmadmin.vercel.app'
+          'https://hsmadmin.vercel.app',
+          'https://housingsociety.vercel.app'
         ].filter(Boolean),
         methods: ['GET', 'POST'],
         credentials: true,
