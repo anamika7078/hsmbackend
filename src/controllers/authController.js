@@ -30,8 +30,10 @@ const login = async (req, res) => {
     }
 
     const user = userQuery.rows[0];
+    console.log('User found:', { id: user.id, email: user.email, is_active: user.is_active, has_password: !!user.password_hash });
 
     if (!user.is_active) {
+      console.log('Login failed: Account deactivated');
       return res.status(403).json({
         success: false,
         message: 'Account is deactivated. Please contact society admin.'
@@ -40,6 +42,7 @@ const login = async (req, res) => {
 
     // Check if user has password
     if (!user.password_hash) {
+      console.log('Login failed: No password hash');
       return res.status(400).json({
         success: false,
         message: 'No password set for this account. Please use OTP login or contact admin.'
@@ -47,8 +50,12 @@ const login = async (req, res) => {
     }
 
     // Verify password
+    console.log('Verifying password...');
     const isValidPassword = await bcrypt.compare(password, user.password_hash);
+    console.log('Password valid:', isValidPassword);
+    
     if (!isValidPassword) {
+      console.log('Login failed: Invalid password');
       return res.status(401).json({
         success: false,
         message: 'Invalid password'
