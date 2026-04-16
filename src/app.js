@@ -32,12 +32,20 @@ app.use(limiter);
 
 app.use(
   cors({
-    origin: [
-      process.env.FRONTEND_URL,
-      'http://localhost:3000',
-      'https://hsmadmin.vercel.app',
-      'https://housingsociety.vercel.app'
-    ].filter(Boolean),
+    origin: (origin, callback) => {
+      const allowedOrigins = [
+        process.env.FRONTEND_URL,
+        'http://localhost:3000',
+        'https://hsmadmin.vercel.app',
+        'https://housingsociety.vercel.app'
+      ].filter(Boolean);
+
+      if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
     credentials: true,
   }),
 );
