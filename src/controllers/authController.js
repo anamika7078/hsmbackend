@@ -132,8 +132,7 @@ const sendLoginOTP = async (req, res) => {
       data: {
         mobile: mobile,
         name: user.name,
-        role: user.role,
-        otp: process.env.NODE_ENV === 'development' ? otpResult.otp : undefined
+        role: user.role
       }
     });
   } catch (error) {
