@@ -15,6 +15,8 @@ const { authenticateToken, authorizeRoles } = require('../middleware/auth');
 router.post('/send-otp', sendLoginOTP);
 router.post('/verify-otp', verifyLoginOTP);
 router.post('/login', login);
+router.post('/forgot-password', forgotPasswordRequest);
+router.post('/reset-password', resetPasswordWithOTP);
 
 // Protected routes
 router.get('/profile', authenticateToken, getProfile);

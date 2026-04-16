@@ -421,6 +421,65 @@ const changePassword = async (req, res) => {
   }
 };
 
+// Forgot password - Step 1: Request OTP
+const forgotPasswordRequest = async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ success: false, message: 'Email is required' });
+    }
+
+    const userQuery = await db.query('SELECT mobile FROM users WHERE email = ?', [email]);
+    if (userQuery.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'No account found with this email' });
+    }
+
+    const mobile = userQuery.rows[0].mobile;
+    const otpResult = await sendOTP(mobile);
+    
+    res.status(200).json({
+      success: true,
+      message: 'Password reset OTP sent to registered mobile',
+      data: { mobile: mobile.replace(/.(?=.{4})/g, '*') } // Obfuscate mobile
+    });
+  } catch (error) {
+    console.error('Error in forgotPasswordRequest:', error);
+    res.status(500).json({ success: false, message: 'Failed to send reset OTP' });
+  }
+};
+
+// Forgot password - Step 2: Reset password
+const resetPasswordWithOTP = async (req, res) => {
+  try {
+    const { email, otp, newPassword } = req.body;
+    if (!email || !otp || !newPassword) {
+      return res.status(400).json({ success: false, message: 'Email, OTP, and new password are required' });
+    }
+
+    const userQuery = await db.query('SELECT mobile, id FROM users WHERE email = ?', [email]);
+    if (userQuery.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    const { mobile, id } = userQuery.rows[0];
+
+    // Verify OTP
+    const otpResult = await verifyOTP(mobile, otp);
+    if (!otpResult.success) {
+      return res.status(400).json({ success: false, message: otpResult.message });
+    }
+
+    // Update password
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    await db.query('UPDATE users SET password_hash = ? WHERE id = ?', [passwordHash, id]);
+
+    res.status(200).json({ success: true, message: 'Password reset successfully. You can now login.' });
+  } catch (error) {
+    console.error('Error in resetPasswordWithOTP:', error);
+    res.status(500).json({ success: false, message: 'Failed to reset password' });
+  }
+};
+
 module.exports = {
   login,
   sendLoginOTP,
@@ -428,5 +487,7 @@ module.exports = {
   registerUser,
   getProfile,
   updateProfile,
-  changePassword
+  changePassword,
+  forgotPasswordRequest,
+  resetPasswordWithOTP
 };
