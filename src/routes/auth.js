@@ -7,7 +7,9 @@ const {
   registerUser,
   getProfile,
   updateProfile,
-  changePassword
+  changePassword,
+  forgotPasswordRequest,
+  resetPasswordWithOTP
 } = require('../controllers/authController');
 const { authenticateToken, authorizeRoles } = require('../middleware/auth');
 
