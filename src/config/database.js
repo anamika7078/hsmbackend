@@ -36,11 +36,22 @@ async function initializeDatabase() {
   }
 
   initPromise = (async () => {
-    const host = process.env.DB_HOST || 'localhost';
-    const port = Number(process.env.DB_PORT || 3306);
-    const user = process.env.DB_USER || 'root';
-    const password = process.env.DB_PASSWORD || '';
-    const database = process.env.DB_NAME || 'society_management';
+    let host = 'localhost', port = 3306, user = 'root', password = '', database = 'society_management';
+
+    if (process.env.DATABASE_URL) {
+      const dbUrl = new URL(process.env.DATABASE_URL);
+      host = dbUrl.hostname;
+      port = Number(dbUrl.port) || 3306;
+      user = decodeURIComponent(dbUrl.username);
+      password = decodeURIComponent(dbUrl.password);
+      database = decodeURIComponent(dbUrl.pathname.replace(/^\//, ''));
+    } else {
+      host = process.env.DB_HOST || 'localhost';
+      port = Number(process.env.DB_PORT || 3306);
+      user = process.env.DB_USER || 'root';
+      password = process.env.DB_PASSWORD || '';
+      database = process.env.DB_NAME || 'society_management';
+    }
 
     const adminConnection = await mysql.createConnection({ host, port, user, password, multipleStatements: true });
     await adminConnection.query(`CREATE DATABASE IF NOT EXISTS \`${database}\``);
