@@ -1,7 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const {
+  getAllSocieties,
   getSocietyDetails,
+  createSociety,
   updateSocietyDetails,
   uploadLogo,
   getAllWings,
@@ -16,8 +18,10 @@ const {
 const { authenticateToken, authorizeRoles } = require('../middleware/auth');
 const upload = require('../middleware/upload');
 
-// Society details routes
-router.get('/details', authenticateToken, getSocietyDetails);
+// Society management routes
+router.get('/', authenticateToken, getAllSocieties);
+router.post('/', authenticateToken, authorizeRoles('committee'), createSociety);
+router.get('/details/:id?', authenticateToken, getSocietyDetails);
 router.put('/details', authenticateToken, authorizeRoles('committee'), updateSocietyDetails);
 router.post('/logo', authenticateToken, authorizeRoles('committee'), upload.single('logo'), uploadLogo);
 

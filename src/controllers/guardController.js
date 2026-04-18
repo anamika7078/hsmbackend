@@ -10,8 +10,13 @@ const getAllGuards = async (req, res) => {
     let queryParams = [];
 
     if (is_active !== 'all') {
-      whereClause += ' AND g.is_active = $1';
+      whereClause += ` AND g.is_active = $${queryParams.length + 1}`;
       queryParams.push(is_active === 'true');
+    }
+
+    if (req.query.society_id && req.query.society_id !== '') {
+      whereClause += ` AND g.society_id = $${queryParams.length + 1}`;
+      queryParams.push(req.query.society_id);
     }
 
     const query = `
@@ -59,12 +64,12 @@ const getAllGuards = async (req, res) => {
 // Create guard (committee only)
 const createGuard = async (req, res) => {
   try {
-    const { name, mobile, email, shift, password } = req.body;
+    const { name, mobile, email, shift, password, society_id } = req.body;
 
-    if (!name || !mobile) {
+    if (!name || !mobile || !society_id) {
       return res.status(400).json({
         success: false,
-        message: 'Name and mobile number are required'
+        message: 'Name, mobile and Society ID are required'
       });
     }
 
@@ -97,11 +102,11 @@ const createGuard = async (req, res) => {
 
     // 3. Create Guard profile
     const result = await db.query(
-      'INSERT INTO guards (user_id, name, mobile, email, shift, society_id) VALUES (?, ?, ?, ?, ?, (SELECT id FROM societies LIMIT 1))',
-      [userId, name, mobile, email, shift || 'day']
+      'INSERT INTO guards (user_id, name, mobile, email, shift, society_id) VALUES ($1, $2, $3, $4, $5, $6)',
+      [userId, name, mobile, email, shift || 'day', society_id]
     );
 
-    const createdGuard = await db.query('SELECT * FROM guards WHERE id = ?', [result.insertId]);
+    const createdGuard = await db.query('SELECT * FROM guards WHERE id = $1', [result.insertId]);
 
     res.status(201).json({
       success: true,
@@ -111,7 +116,7 @@ const createGuard = async (req, res) => {
     });
   } catch (error) {
     console.error('Error in createGuard:', error);
-    res.status(500).json({ success: false, message: 'Failed to create guard' });
+    res.status(500).json({ success: false, message: error.message || 'Failed to create guard' });
   }
 };
 
@@ -343,6 +348,15 @@ const checkOutGuard = async (req, res) => {
 // Get guard statistics
 const getGuardStats = async (req, res) => {
   try {
+    const { society_id } = req.query;
+    let whereClause = '';
+    let queryParams = [];
+
+    if (society_id) {
+      whereClause = 'WHERE society_id = $1';
+      queryParams.push(society_id);
+    }
+
     const stats = await db.query(`
       SELECT 
         COUNT(*) as total_guards,
@@ -351,7 +365,8 @@ const getGuardStats = async (req, res) => {
         COUNT(CASE WHEN shift = 'day' THEN 1 END) as day_shift_guards,
         COUNT(CASE WHEN shift = 'night' THEN 1 END) as night_shift_guards
       FROM guards
-    `);
+      ${whereClause}
+    `, queryParams);
 
     res.status(200).json({
       success: true,

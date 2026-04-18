@@ -1,7 +1,7 @@
 const db = require('../config/database');
 
-// Get society details
-const getSocietyDetails = async (req, res) => {
+// Get all societies
+const getAllSocieties = async (req, res) => {
   try {
     const query = `
       SELECT s.*, 
@@ -12,11 +12,83 @@ const getSocietyDetails = async (req, res) => {
       LEFT JOIN wings w ON s.id = w.society_id
       LEFT JOIN flats f ON w.id = f.wing_id
       GROUP BY s.id
-      ORDER BY s.id
-      LIMIT 1
+      ORDER BY s.name ASC
     `;
 
     const result = await db.query(query);
+
+    res.status(200).json({
+      success: true,
+      data: result.rows
+    });
+  } catch (error) {
+    console.error('Error in getAllSocieties:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch societies'
+    });
+  }
+};
+
+// Create new society
+const createSociety = async (req, res) => {
+  try {
+    const { name, address, landmark, city, state, pincode, registration_number, email, phone } = req.body;
+
+    if (!name) {
+      return res.status(400).json({
+        success: false,
+        message: 'Society name is required'
+      });
+    }
+
+    const result = await db.query(
+      `INSERT INTO societies (name, address, landmark, city, state, pincode, registration_number, email, phone)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [name, address, landmark, city, state, pincode, registration_number, email, phone]
+    );
+
+    const createdSociety = await db.query('SELECT * FROM societies WHERE id = ?', [result.insertId]);
+
+    res.status(201).json({
+      success: true,
+      message: 'Society created successfully',
+      data: createdSociety.rows[0]
+    });
+  } catch (error) {
+    console.error('Error in createSociety:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to create society'
+    });
+  }
+};
+
+// Get society details (by ID)
+const getSocietyDetails = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const targetId = id || null;
+
+    let query = `
+      SELECT s.*, 
+             COUNT(DISTINCT w.id) as total_wings,
+             COUNT(DISTINCT f.id) as total_flats,
+             COUNT(DISTINCT CASE WHEN f.is_occupied = true THEN f.id END) as occupied_flats
+      FROM societies s
+      LEFT JOIN wings w ON s.id = w.society_id
+      LEFT JOIN flats f ON w.id = f.wing_id
+    `;
+    
+    let queryParams = [];
+    if (targetId) {
+      query += ` WHERE s.id = ?`;
+      queryParams.push(targetId);
+    }
+    
+    query += ` GROUP BY s.id ORDER BY s.id LIMIT 1`;
+
+    const result = await db.query(query, queryParams);
 
     if (result.rows.length === 0) {
       return res.status(404).json({
@@ -136,18 +208,18 @@ const getAllWings = async (req, res) => {
 // Create wing
 const createWing = async (req, res) => {
   try {
-    const { name, floors, flats_per_floor } = req.body;
+    const { society_id, name, floors, flats_per_floor } = req.body;
 
-    if (!name) {
+    if (!name || !society_id) {
       return res.status(400).json({
         success: false,
-        message: 'Wing name is required'
+        message: 'Wing name and Society ID are required'
       });
     }
 
     const result = await db.query(
-      'INSERT INTO wings (society_id, name, floors, flats_per_floor) VALUES ((SELECT id FROM societies LIMIT 1), $1, $2, $3)',
-      [name, floors || 0, flats_per_floor || 0]
+      'INSERT INTO wings (society_id, name, floors, flats_per_floor) VALUES (?, ?, ?, ?)',
+      [society_id, name, floors || 0, flats_per_floor || 0]
     );
 
     const createdWing = await db.query('SELECT * FROM wings WHERE id = ?', [result.insertId]);
@@ -394,7 +466,9 @@ const deleteFlat = async (req, res) => {
 };
 
 module.exports = {
+  getAllSocieties,
   getSocietyDetails,
+  createSociety,
   updateSocietyDetails,
   uploadLogo,
   getAllWings,

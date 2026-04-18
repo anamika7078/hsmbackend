@@ -101,8 +101,8 @@ const createStaff = async (req, res) => {
   try {
     const { name, mobile, email, role, staff_type, id_proof_type, id_proof_number, society_id, flat_ids } = req.body;
 
-    if (!name || !mobile || !role) {
-      return res.status(400).json({ success: false, message: 'Name, mobile and role are required' });
+    if (!name || !mobile || !role || !society_id) {
+      return res.status(400).json({ success: false, message: 'Name, mobile, role and Society ID are required' });
     }
 
     // Check if mobile already exists
@@ -111,12 +111,10 @@ const createStaff = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Staff with this mobile number already exists' });
     }
 
-    const sid = society_id || (await db.query('SELECT id FROM societies LIMIT 1')).rows[0]?.id;
-
     const result = await db.query(
       `INSERT INTO staff (name, mobile, email, role, staff_type, id_proof_type, id_proof_number, society_id) 
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [name, mobile, email || null, role, staff_type || 'regular', id_proof_type, id_proof_number, sid]
+      [name, mobile, email || null, role, staff_type || 'regular', id_proof_type, id_proof_number, society_id]
     );
 
     const staffId = result.insertId;
