@@ -20,13 +20,48 @@ const executeSchema = async (connection) => {
     try {
       await connection.query(statement);
     } catch (error) {
-      // Allow idempotent schema bootstrapping across MySQL/MariaDB variants.
-      // 1061: duplicate key name, 1062: duplicate entry, 1050: table exists
       if ([1061, 1062, 1050].includes(error.errno)) {
         continue;
       }
       throw error;
     }
+  }
+
+  // --- MIGRATIONS / SELF-HEALING ---
+  try {
+    // Ensure 'societies' table exists (it should from init.sql, but just in case)
+    // Ensure 'guards' table has the necessary columns if it was created long ago
+    const [columns] = await connection.query("SHOW COLUMNS FROM guards");
+    const columnNames = columns.map(c => c.Field);
+    
+    if (!columnNames.includes('user_id')) {
+      console.log('Migrating: Adding user_id to guards');
+      await connection.query("ALTER TABLE guards ADD COLUMN user_id INT AFTER id");
+    }
+    
+    if (!columnNames.includes('society_id')) {
+      console.log('Migrating: Adding society_id to guards');
+      await connection.query("ALTER TABLE guards ADD COLUMN society_id INT AFTER shift");
+    }
+
+    // Ensure wings has society_id
+    const [wingCols] = await connection.query("SHOW COLUMNS FROM wings");
+    const wingColNames = wingCols.map(c => c.Field);
+    if (!wingColNames.includes('society_id')) {
+      console.log('Migrating: Adding society_id to wings');
+      await connection.query("ALTER TABLE wings ADD COLUMN society_id INT AFTER id");
+    }
+
+    // Ensure staff has society_id
+    const [staffCols] = await connection.query("SHOW COLUMNS FROM staff");
+    const staffColNames = staffCols.map(c => c.Field);
+    if (!staffColNames.includes('society_id')) {
+      console.log('Migrating: Adding society_id to staff');
+      await connection.query("ALTER TABLE staff ADD COLUMN society_id INT AFTER id_proof_number");
+    }
+
+  } catch (error) {
+    console.warn('Migration check failed (might be first run):', error.message);
   }
 };
 

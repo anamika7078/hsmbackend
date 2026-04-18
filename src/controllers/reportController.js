@@ -4,40 +4,64 @@ const db = require('../config/database');
 const getDashboardStats = async (req, res) => {
   try {
     const userRole = req.user.role;
+    const { society_id } = req.query;
     let stats = {};
 
     if (userRole === 'committee') {
+      let societyFilter = '';
+      let memberFilter = '';
+      let queryParams = [];
+
+      if (society_id) {
+        societyFilter = 'WHERE society_id = $1';
+        memberFilter = 'AND wings.society_id = $1';
+        queryParams.push(society_id);
+      }
+
       // Committee gets all statistics
       const [memberStats, visitorStats, billingStats, complaintStats] = await Promise.all([
         db.query(`
           SELECT 
-            COUNT(*) as total_members,
-            COUNT(CASE WHEN is_verified = true THEN 1 END) as verified_members,
-            COUNT(CASE WHEN is_active = true THEN 1 END) as active_members
-          FROM users WHERE role = 'member'
-        `),
+            COUNT(DISTINCT u.id) as total_members,
+            COUNT(DISTINCT CASE WHEN u.is_verified = true THEN u.id END) as verified_members,
+            COUNT(DISTINCT CASE WHEN u.is_active = true THEN u.id END) as active_members
+          FROM users u
+          LEFT JOIN member_flats mf ON u.id = mf.user_id
+          LEFT JOIN flats ON mf.flat_id = flats.id
+          LEFT JOIN wings ON flats.wing_id = wings.id
+          WHERE u.role = 'member' ${memberFilter}
+        `, queryParams),
         db.query(`
           SELECT 
             COUNT(*) as total_visitors,
-            COUNT(CASE WHEN status = 'checked_in' THEN 1 END) as active_visitors,
-            COUNT(CASE WHEN DATE(created_at) = CURRENT_DATE THEN 1 END) as today_visitors
+            COUNT(CASE WHEN visitors.status = 'checked_in' THEN 1 END) as active_visitors,
+            COUNT(CASE WHEN DATE(visitors.created_at) = CURRENT_DATE THEN 1 END) as today_visitors
           FROM visitors
-        `),
+          LEFT JOIN flats ON visitors.visiting_flat_id = flats.id
+          LEFT JOIN wings ON flats.wing_id = wings.id
+          ${society_id ? 'WHERE wings.society_id = $1' : ''}
+        `, queryParams),
         db.query(`
           SELECT 
             COUNT(*) as total_bills,
-            COUNT(CASE WHEN status = 'unpaid' THEN 1 END) as unpaid_bills,
+            COUNT(CASE WHEN bills.status = 'unpaid' THEN 1 END) as unpaid_bills,
             COALESCE(SUM(amount), 0) as total_amount,
-            COALESCE(SUM(CASE WHEN status != 'paid' THEN amount ELSE 0 END), 0) as outstanding_amount
+            COALESCE(SUM(CASE WHEN bills.status != 'paid' THEN amount ELSE 0 END), 0) as outstanding_amount
           FROM bills
-        `),
+          LEFT JOIN flats ON bills.flat_id = flats.id
+          LEFT JOIN wings ON flats.wing_id = wings.id
+          ${society_id ? ' WHERE wings.society_id = $1' : ''}
+        `, queryParams),
         db.query(`
           SELECT 
             COUNT(*) as total_complaints,
-            COUNT(CASE WHEN status = 'open' THEN 1 END) as open_complaints,
-            COUNT(CASE WHEN status = 'in_progress' THEN 1 END) as in_progress_complaints
+            COUNT(CASE WHEN complaints.status = 'open' THEN 1 END) as open_complaints,
+            COUNT(CASE WHEN complaints.status = 'in_progress' THEN 1 END) as in_progress_complaints
           FROM complaints
-        `)
+          LEFT JOIN flats ON complaints.flat_id = flats.id
+          LEFT JOIN wings ON flats.wing_id = wings.id
+          ${society_id ? 'WHERE wings.society_id = $1' : ''}
+        `, queryParams)
       ]);
 
       stats = {
