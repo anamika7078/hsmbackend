@@ -3,14 +3,19 @@ const db = require('../config/database');
 // Get all members (committee only)
 const getAllMembers = async (req, res) => {
   try {
-    const { page = 1, limit = 10, search = '', status = 'all' } = req.query;
+    const { page = 1, limit = 10, search = '', status = 'all', society_id } = req.query;
     const offset = (page - 1) * limit;
 
-    let whereClause = 'WHERE u.role != \'committee\'';
+    let whereClause = "WHERE u.role = 'member'";
     let queryParams = [];
 
+    if (society_id && society_id !== '') {
+      whereClause += ` AND w.society_id = $${queryParams.length + 1}`;
+      queryParams.push(society_id);
+    }
+
     if (search) {
-      whereClause += ' AND (u.name LIKE ? OR u.mobile LIKE ? OR u.email LIKE ?)';
+      whereClause += ` AND (u.name LIKE $${queryParams.length + 1} OR u.mobile LIKE $${queryParams.length + 2} OR u.email LIKE $${queryParams.length + 3})`;
       queryParams.push(`%${search}%`, `%${search}%`, `%${search}%`);
     }
 
@@ -32,10 +37,10 @@ const getAllMembers = async (req, res) => {
       LEFT JOIN societies s ON w.society_id = s.id
       ${whereClause}
       ORDER BY u.created_at DESC
-      LIMIT ? OFFSET ?
+      LIMIT $${queryParams.length + 1} OFFSET $${queryParams.length + 2}
     `;
 
-    queryParams.push(limit, offset);
+    queryParams.push(parseInt(limit), offset);
 
     const result = await db.query(query, queryParams);
 
@@ -258,16 +263,28 @@ const updateMember = async (req, res) => {
 // Get member statistics
 const getMemberStats = async (req, res) => {
   try {
+    const { society_id } = req.query;
+    let whereClause = "WHERE u.role = 'member'";
+    let queryParams = [];
+
+    if (society_id && society_id !== '') {
+      whereClause += ' AND w.society_id = $1';
+      queryParams.push(society_id);
+    }
+
     const stats = await db.query(`
       SELECT 
-        COUNT(*) as total_members,
-        COUNT(CASE WHEN is_verified = 1 THEN 1 END) as verified_members,
-        COUNT(CASE WHEN is_verified = 0 THEN 1 END) as unverified_members,
-        COUNT(CASE WHEN is_active = 1 THEN 1 END) as active_members,
-        COUNT(CASE WHEN is_active = 0 THEN 1 END) as inactive_members
-      FROM users 
-      WHERE role = 'member'
-    `);
+        COUNT(DISTINCT u.id) as total_members,
+        COUNT(DISTINCT CASE WHEN u.is_verified = 1 THEN u.id END) as verified_members,
+        COUNT(DISTINCT CASE WHEN u.is_verified = 0 THEN u.id END) as unverified_members,
+        COUNT(DISTINCT CASE WHEN u.is_active = 1 THEN u.id END) as active_members,
+        COUNT(DISTINCT CASE WHEN u.is_active = 0 THEN u.id END) as inactive_members
+      FROM users u
+      LEFT JOIN member_flats mf ON u.id = mf.user_id
+      LEFT JOIN flats f ON mf.flat_id = f.id
+      LEFT JOIN wings w ON f.wing_id = w.id
+      ${whereClause}
+    `, queryParams);
 
     res.status(200).json({
       success: true,
