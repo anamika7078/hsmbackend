@@ -4,28 +4,29 @@ const { generateToken } = require('../middleware/auth');
 const { sendOTP, verifyOTP } = require('../services/otpService');
 const { validationResult } = require('express-validator');
 
-// Email/Password login
+// Email/Mobile + Password login
 const login = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { identifier, email, mobile, password } = req.body;
+    const loginId = identifier || email || mobile;
 
-    if (!email || !password) {
+    if (!loginId || !password) {
       return res.status(400).json({
         success: false,
-        message: 'Email and password are required'
+        message: 'Email/Mobile and password are required'
       });
     }
 
-    // Check if user exists
+    // Check if user exists by email or mobile
     const userQuery = await db.query(
-      'SELECT id, name, email, mobile, role, is_active, is_verified, password_hash FROM users WHERE email = ?',
-      [email]
+      'SELECT id, name, email, mobile, role, is_active, is_verified, password_hash FROM users WHERE email = ? OR mobile = ?',
+      [loginId, loginId]
     );
 
     if (userQuery.rows.length === 0) {
       return res.status(404).json({
         success: false,
-        message: 'User not found. Please check your email.'
+        message: 'User not found. Please check your credentials.'
       });
     }
 

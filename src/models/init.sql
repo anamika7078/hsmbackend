@@ -73,6 +73,7 @@ CREATE TABLE IF NOT EXISTS member_flats (
 -- Guards table
 CREATE TABLE IF NOT EXISTS guards (
     id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT,
     name VARCHAR(255) NOT NULL,
     mobile VARCHAR(20) NOT NULL,
     email VARCHAR(255),
@@ -80,6 +81,7 @@ CREATE TABLE IF NOT EXISTS guards (
     is_active BOOLEAN DEFAULT TRUE,
     society_id INT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (society_id) REFERENCES societies(id) ON DELETE CASCADE
 );
 
@@ -240,7 +242,53 @@ CREATE TABLE IF NOT EXISTS otps (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Staff table (helpers, maids, drivers, etc.)
+CREATE TABLE IF NOT EXISTS staff (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    mobile VARCHAR(20) UNIQUE NOT NULL,
+    email VARCHAR(255),
+    role VARCHAR(100) NOT NULL, -- e.g., 'maid', 'driver', 'plumber', 'electrician'
+    staff_type ENUM('regular', 'on_call') DEFAULT 'regular',
+    photo_url TEXT,
+    is_active BOOLEAN DEFAULT TRUE,
+    id_proof_type ENUM('aadhar', 'pan', 'voter_id', 'driving_license', 'other'),
+    id_proof_number VARCHAR(100),
+    society_id INT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (society_id) REFERENCES societies(id) ON DELETE CASCADE
+);
+
+-- Staff logs table (for entry/exit tracking)
+CREATE TABLE IF NOT EXISTS staff_logs (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    staff_id INT,
+    check_in_time TIMESTAMP NULL,
+    check_out_time TIMESTAMP NULL,
+    entry_gate VARCHAR(100),
+    exit_gate VARCHAR(100),
+    notes TEXT,
+    shift_date DATE NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (staff_id) REFERENCES staff(id) ON DELETE CASCADE
+);
+
+-- Staff-Flat mapping (for regular help)
+CREATE TABLE IF NOT EXISTS staff_flats (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    staff_id INT,
+    flat_id INT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (staff_id) REFERENCES staff(id) ON DELETE CASCADE,
+    FOREIGN KEY (flat_id) REFERENCES flats(id) ON DELETE CASCADE,
+    UNIQUE KEY unique_staff_flat (staff_id, flat_id)
+);
+
 -- Create indexes for better performance
+CREATE INDEX idx_staff_mobile ON staff(mobile);
+CREATE INDEX idx_staff_role ON staff(role);
+CREATE INDEX idx_staff_logs_date ON staff_logs(shift_date);
 CREATE INDEX idx_users_mobile ON users(mobile);
 CREATE INDEX idx_users_role ON users(role);
 CREATE INDEX idx_member_flats_user_id ON member_flats(user_id);

@@ -17,6 +17,7 @@ const complaintRoutes = require('./routes/complaints');
 const reportRoutes = require('./routes/reports');
 const vehicleRoutes = require('./routes/vehicles');
 const emergencyRoutes = require('./routes/emergency');
+const staffRoutes = require('./routes/staff');
 
 const app = express();
 
@@ -67,6 +68,7 @@ app.use('/api/complaints', complaintRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/vehicles', vehicleRoutes);
 app.use('/api/emergency', emergencyRoutes);
+app.use('/api/staff', staffRoutes);
 
 app.get('/api/health', (req, res) => {
   res.status(200).json({
