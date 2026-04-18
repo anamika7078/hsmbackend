@@ -124,25 +124,42 @@ const createGuard = async (req, res) => {
 const updateGuard = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, mobile, email, shift, is_active } = req.body;
+    const { name, mobile, email, shift, is_active, password } = req.body;
 
+    // 1. Update Guard Profile
     const result = await db.query(
       'UPDATE guards SET name = $1, mobile = $2, email = $3, shift = $4, is_active = $5 WHERE id = $6',
       [name, mobile, email, shift, is_active, id]
     );
 
-    if (!result.affectedRows) {
-      return res.status(404).json({
-        success: false,
-        message: 'Guard not found'
-      });
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ success: false, message: 'Guard not found' });
+    }
+
+    // 2. Sync with Users table and update password if provided
+    const guardUser = await db.query('SELECT user_id FROM guards WHERE id = $1', [id]);
+    if (guardUser.rows.length > 0) {
+      const userId = guardUser.rows[0].user_id;
+      let userUpdateSql = 'UPDATE users SET name = $1, mobile = $2, email = $3, is_active = $4';
+      let userParams = [name, mobile, email, is_active];
+
+      if (password && password.trim() !== '') {
+        const bcrypt = require('bcryptjs');
+        const passwordHash = await bcrypt.hash(password, 10);
+        userUpdateSql += ', password_hash = $5 WHERE id = $6';
+        userParams.push(passwordHash, userId);
+      } else {
+        userUpdateSql += ' WHERE id = $5';
+        userParams.push(userId);
+      }
+      await db.query(userUpdateSql, userParams);
     }
 
     const updatedGuard = await db.query('SELECT * FROM guards WHERE id = ?', [id]);
 
     res.status(200).json({
       success: true,
-      message: 'Guard updated successfully',
+      message: 'Guard profile and security account updated successfully',
       data: updatedGuard.rows[0]
     });
   } catch (error) {
