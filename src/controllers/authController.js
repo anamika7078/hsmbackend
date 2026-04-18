@@ -84,6 +84,30 @@ const login = async (req, res) => {
       }
     };
 
+    // If security role, attach society and guard profile
+    if (user.role === 'security') {
+      const guardQuery = await db.query(
+        'SELECT g.id as guard_id, g.shift, s.* FROM guards g JOIN societies s ON g.society_id = s.id WHERE g.user_id = ?',
+        [user.id]
+      );
+      if (guardQuery.rows.length > 0) {
+        responseData.data.guard = {
+          id: guardQuery.rows[0].guard_id,
+          shift: guardQuery.rows[0].shift
+        };
+        responseData.data.society = {
+          id: guardQuery.rows[0].id,
+          name: guardQuery.rows[0].name,
+          address: guardQuery.rows[0].address,
+          city: guardQuery.rows[0].city,
+          state: guardQuery.rows[0].state,
+          pincode: guardQuery.rows[0].pincode,
+          phone: guardQuery.rows[0].phone,
+          email: guardQuery.rows[0].email
+        };
+      }
+    }
+
     console.log('Sending response');
     res.status(200).json(responseData);
     console.log('Response sent successfully');
@@ -191,7 +215,7 @@ const verifyLoginOTP = async (req, res) => {
     // Generate JWT token
     const token = generateToken(user.id, user.role);
 
-    res.status(200).json({
+    const otpResponseData = {
       success: true,
       message: 'Login successful',
       data: {
@@ -205,7 +229,33 @@ const verifyLoginOTP = async (req, res) => {
           is_verified: user.is_verified
         }
       }
-    });
+    };
+
+    // If security role, attach society and guard profile
+    if (user.role === 'security') {
+      const guardQuery = await db.query(
+        'SELECT g.id as guard_id, g.shift, s.* FROM guards g JOIN societies s ON g.society_id = s.id WHERE g.user_id = ?',
+        [user.id]
+      );
+      if (guardQuery.rows.length > 0) {
+        otpResponseData.data.guard = {
+          id: guardQuery.rows[0].guard_id,
+          shift: guardQuery.rows[0].shift
+        };
+        otpResponseData.data.society = {
+          id: guardQuery.rows[0].id,
+          name: guardQuery.rows[0].name,
+          address: guardQuery.rows[0].address,
+          city: guardQuery.rows[0].city,
+          state: guardQuery.rows[0].state,
+          pincode: guardQuery.rows[0].pincode,
+          phone: guardQuery.rows[0].phone,
+          email: guardQuery.rows[0].email
+        };
+      }
+    }
+
+    res.status(200).json(otpResponseData);
   } catch (error) {
     console.error('Error in verifyLoginOTP:', error);
     res.status(500).json({
@@ -309,11 +359,33 @@ const getProfile = async (req, res) => {
     }
 
     const user = userQuery.rows[0];
+    const responseData = { success: true, data: { user } };
 
-    res.status(200).json({
-      success: true,
-      data: user
-    });
+    // For security guards, also attach guard profile and society
+    if (user.role === 'security') {
+      const guardQuery = await db.query(
+        'SELECT g.id as guard_id, g.shift, s.* FROM guards g JOIN societies s ON g.society_id = s.id WHERE g.user_id = ?',
+        [userId]
+      );
+      if (guardQuery.rows.length > 0) {
+        responseData.data.guard = {
+          id: guardQuery.rows[0].guard_id,
+          shift: guardQuery.rows[0].shift
+        };
+        responseData.data.society = {
+          id: guardQuery.rows[0].id,
+          name: guardQuery.rows[0].name,
+          address: guardQuery.rows[0].address,
+          city: guardQuery.rows[0].city,
+          state: guardQuery.rows[0].state,
+          pincode: guardQuery.rows[0].pincode,
+          phone: guardQuery.rows[0].phone,
+          email: guardQuery.rows[0].email
+        };
+      }
+    }
+
+    res.status(200).json(responseData);
   } catch (error) {
     console.error('Error in getProfile:', error);
     res.status(500).json({

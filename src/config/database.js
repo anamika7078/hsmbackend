@@ -60,6 +60,14 @@ const executeSchema = async (connection) => {
       await connection.query("ALTER TABLE staff ADD COLUMN society_id INT AFTER id_proof_number");
     }
 
+    // Ensure visitors has photo_url
+    const [visitorCols] = await connection.query("SHOW COLUMNS FROM visitors");
+    const visitorColNames = visitorCols.map(c => c.Field);
+    if (!visitorColNames.includes('photo_url')) {
+      console.log('Migrating: Adding photo_url to visitors');
+      await connection.query("ALTER TABLE visitors ADD COLUMN photo_url TEXT AFTER mobile");
+    }
+
   } catch (error) {
     console.warn('Migration check failed (might be first run):', error.message);
   }

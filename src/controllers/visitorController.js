@@ -55,8 +55,9 @@ const getMyVisitors = async (req, res) => {
 
 const createVisitorRequest = async (req, res) => {
   try {
-    const { name, mobile, visitor_type, purpose, vehicle_number, visiting_flat_id, expected_arrival } = req.body;
+    const { name, mobile, visitor_type, visit_frequency, purpose, vehicle_number, visiting_flat_id, expected_arrival } = req.body;
     const isSecurity = req.user.role === 'security';
+    const photo_url = req.file ? `/uploads/visitors/${req.file.filename}` : req.body.photo_url || null;
 
     if (!name || !mobile || !visiting_flat_id) {
       console.log('Validation failed:', { name, mobile, visiting_flat_id });
@@ -72,15 +73,17 @@ const createVisitorRequest = async (req, res) => {
 
     const query = `
       INSERT INTO visitors 
-      (name, mobile, visitor_type, purpose, vehicle_number, visiting_flat_id, visiting_member_id, expected_arrival, status) 
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (name, mobile, photo_url, visitor_type, visit_frequency, purpose, vehicle_number, visiting_flat_id, visiting_member_id, expected_arrival, status) 
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
     
     const status = isSecurity ? 'pending' : 'approved';
     const params = [
       name, 
-      mobile, 
-      visitor_type || 'guest', 
+      mobile,
+      photo_url,
+      visitor_type || 'guest',
+      visit_frequency || 'one_time',
       purpose || null, 
       vehicle_number || null, 
       visiting_flat_id, 
@@ -92,7 +95,7 @@ const createVisitorRequest = async (req, res) => {
     console.log('Attempting visitor insert with params:', params);
     const created = await db.query(query, params);
 
-    res.status(201).json({ success: true, message: 'Visitor request created', data: { id: created.insertId } });
+    res.status(201).json({ success: true, message: 'Visitor request created', data: { id: created.insertId, photo_url } });
   } catch (error) {
     console.error('Error in createVisitorRequest:', error);
     res.status(500).json({ 
